@@ -175,7 +175,7 @@ model.summary()
 
 # Train the model each generation and show predictions against the validation
 # dataset.
-for iteration in range(1, 33):
+for iteration in range(1, 34):
     print()
     print('-' * 50)
     print('Iteration', iteration)
