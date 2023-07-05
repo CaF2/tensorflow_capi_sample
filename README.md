@@ -27,3 +27,20 @@ The code will download the library neccessary and compile the code for you.
 You will need the tensorflow library installed on your computer.
 If you are with windows, i would strongly recommend to build this with msys2. Otherwise build this in a docker environment. 
 I built this with Archlinux.
+
+## Extract model information:
+
+using `serving_default` signature key into command to print out the tensor node:
+```
+saved_model_cli show --dir <path_to_saved_model_folder> --tag_set serve --signature_def serving_default
+```
+
+# Examples
+
+## demo1_very_simple
+
+Will demonstrate how to use the C API in basic terms. Like this input and output tensors.
+
+## demo2_simple_train
+
+Will show the keras addition example which will train and generate a model which we will use with the C API

@@ -1,6 +1,9 @@
 *.c.o
 *.c.d
 main
-lstm2
 clib
 *.tar.gz
+
+add_rnn
+lstm2
+
