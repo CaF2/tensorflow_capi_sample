@@ -66,7 +66,7 @@ lstm2:
 $(NAME): $(OBJS) | lstm2
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-%.c.o: %.c $(CLIB_PATH) 
+%.c.o: %.c $(if NO_DL,,$(CLIB_PATH))
 	$(CC) $< -c -o $@ $(CFLAGS)
 	
 run: all

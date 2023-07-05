@@ -63,12 +63,12 @@ $(CLIB_PATH): $(ROOT_PATH)/$(TENSORFLOW_PKG)
 	cd $(ROOT_PATH); tar -xvf $(TENSORFLOW_PKG) -C clib
 
 add_rnn:
-#	python addition_rnn.py
+	python addition_rnn.py
 
 $(NAME): $(OBJS) | add_rnn
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-%.c.o: %.c $(CLIB_PATH) 
+%.c.o: %.c $(if NO_DL,,$(CLIB_PATH))
 	$(CC) $< -c -o $@ $(CFLAGS)
 #	clang-tidy --fix -checks='-*,readability-identifier-naming' -config="{CheckOptions: [ {key: readability-identifier-naming.FunctionCase, value: lower_case}, { key: readability-identifier-naming.StructCase, value: CamelCase}, { key: readability-identifier-naming.VariableCase, value: lower_case }, { key: readability-identifier-naming.GlobalConstantCase, value: UPPER_CASE }, { key: readability-identifier-naming.ClassCase, value: CamelCase},  ]}" $< -- $(CFLAGS)
 	
