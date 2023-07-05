@@ -29,6 +29,9 @@ SOFTWARE.
 const char *TRANSLATION_TBL=" +0123456789";
 size_t TRANSLATION_TBL_LEN=12;
 
+//see invert from the python code.
+int INVERT = 1;
+
 void no_op_deallocator(void *data, size_t a, void *b)
 {
 	
@@ -82,14 +85,28 @@ int set_value_from_char(char c, float *data)
 */
 int set_value_from_string(const char *input, float *data)
 {
+	int i=7;
+
 	for(const char *tmp=input;*tmp;tmp++)
 	{
-		int i=tmp-input;
+		i=tmp-input;
 		if(i>=7)
 		{
 			return 1;
 		}
-		set_value_from_char(*tmp,data+(12*i));
+		
+		const int curr_i=INVERT?(7-i-1):i;
+		set_value_from_char(*tmp,data+(12*curr_i));
+	}
+	
+	i++;
+	
+	while(i<7)
+	{
+		const int curr_i=INVERT?(7-i-1):i;
+		set_value_from_char(' ',data+(12*curr_i));
+	
+		i++;
 	}
 	
 	return 0;
@@ -112,9 +129,9 @@ int set_value_from_string(const char *input, float *data)
 	 @returns
 	 	0=success
 */
-int get_string_from_value(float *data,char *output)
+int get_string_from_value(float *data,char *output, size_t max_num)
 {
-	for(size_t str=0;str<4;str++)
+	for(size_t str=0;str<max_num;str++)
 	{
 		size_t highest=-1;
 		
@@ -140,6 +157,49 @@ int get_string_from_value(float *data,char *output)
 	}
 	
 	return 0;
+}
+
+/**
+	Convert a string of the form "A+B" to the result
+	
+	@param input
+		input string
+	@returns
+		value, if failed -1.
+*/
+long get_actual_result(const char *input)
+{
+	for(char *tmp=(char*)input;*tmp;tmp++)
+	{
+		if(*tmp>='0' && *tmp<='9')
+		{
+			long a_val=strtol(tmp,&tmp,10);
+			
+			if(*tmp=='+')
+			{
+				long b_val=strtol(tmp+1,NULL,10);
+				
+				return a_val+b_val;
+			}
+		}
+	}
+	
+	return -1;
+}
+
+int print_tensor(float *data,size_t num_elements)
+{
+	for (int i = 0; i < num_elements; i++)
+	{
+		if(i%12==0 && i!=0)
+		{
+			printf("\n");
+		}
+	
+		printf("%f ", data[i]);
+	}
+	
+	printf("\n");
 }
 
 int main(const int argc, char **const argv)
@@ -226,10 +286,16 @@ int main(const int argc, char **const argv)
 		data[i] = 1.00;
 	}*/
 	
-	const char *input_data=" 273+92";
-	//const char *input_data=" 273+92";
-	//const char *input_data="    2+2";
+	// Will work for maximum 7 characters
+	const char *input_data="396+9";
+	//const char *input_data="273+92";
+	//const char *input_data="2+2";
+	
 	set_value_from_string(input_data,data);
+	
+	char validate[7+1]={0};
+	get_string_from_value(data,validate,7);
+	
 	int ndata = sizeof(float) * 7 * 12; // This is tricky, it number of bytes not number of element
 
 	TF_Tensor *int_tensor = TF_NewTensor(TF_FLOAT, dims, ndims, data, ndata, &no_op_deallocator, 0);
@@ -266,25 +332,19 @@ int main(const int argc, char **const argv)
 	int64_t num_elements = TF_TensorElementCount(output_values[0]);
 	
 	float *offsets = (float *)buff;
+	
+	printf("Input Tensor %lld:\n",ndata/sizeof(float));
+	print_tensor(data,ndata/sizeof(float));
+	
 	printf("Result Tensor %lld:\n",num_elements);
-	for (int i = 0; i < num_elements; i++)
-	{
-		if(i%12==0)
-		{
-			printf("\n");
-		}
-	
-		printf("%f ", offsets[i]);
-	}
-	
-	printf("\n");
+	print_tensor(offsets,num_elements);
 	
 	//need '\0' in the end
 	char output_s[4+1]={0};
 	
-	get_string_from_value(offsets,output_s);
+	get_string_from_value(offsets,output_s,4);
 	
-	fprintf(stdout,"%s:%d OUTPUT VALUE [%s] = [%s]\n",__FILE__,__LINE__,input_data,output_s);
+	fprintf(stdout,"%s:%d INPUT VALUE [%s] ACTUAL [\"%s\"] = [\"%s\"] (Calculated \"true\" result=%ld)\n",__FILE__,__LINE__,input_data,validate,output_s,get_actual_result(input_data));
 	
 	TF_DeleteTensor(int_tensor);
 	TF_DeleteTensor(output_values[0]);
