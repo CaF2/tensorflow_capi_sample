@@ -26,8 +26,8 @@ SOFTWARE.
 #include <math.h>
 #include "tensorflow/c/c_api.h"
 
-const char *TRANSLATION_TBL=" +0123456789";
-size_t TRANSLATION_TBL_LEN=12;
+const char *TRANSLATION_TBL=" +-0123456789";
+size_t TRANSLATION_TBL_LEN=13;
 
 //see invert from the python code.
 int INVERT = 1;
@@ -43,7 +43,7 @@ void no_op_deallocator(void *data, size_t a, void *b)
 	@param c
 		Input character
 	@param data
-		contents of a tensor cell, in this case float[12]
+		contents of a tensor cell, in this case float[TRANSLATION_TBL_LEN]
 	@returns
 		0=success
 */
@@ -79,7 +79,7 @@ int set_value_from_char(char c, float *data)
 	@param input
 		a string of any size, will add spaces to the end, which is really not what the example is trained for.
 	@param data
-		contents of the tensor. In this case the size float[1*7*12]
+		contents of the tensor. In this case the size float[1*7*TRANSLATION_TBL_LEN]
 	@returns
 		0=success
 */
@@ -96,7 +96,7 @@ int set_value_from_string(const char *input, float *data)
 		}
 		
 		const int curr_i=INVERT?(7-i-1):i;
-		set_value_from_char(*tmp,data+(12*curr_i));
+		set_value_from_char(*tmp,data+(TRANSLATION_TBL_LEN*curr_i));
 	}
 	
 	i++;
@@ -104,7 +104,7 @@ int set_value_from_string(const char *input, float *data)
 	while(i<7)
 	{
 		const int curr_i=INVERT?(7-i-1):i;
-		set_value_from_char(' ',data+(12*curr_i));
+		set_value_from_char(' ',data+(TRANSLATION_TBL_LEN*curr_i));
 	
 		i++;
 	}
@@ -123,7 +123,7 @@ int set_value_from_string(const char *input, float *data)
 	if one value is acceptable, we will convert it to 1 and the rest to 0
 	
 	@param data
-		input data of the size float[1*4*12]
+		input data of the size float[1*4*TRANSLATION_TBL_LEN]
 	@param output
 		string of size 4+1
 	@returns
@@ -137,10 +137,10 @@ int get_string_from_value(float *data,char *output, size_t max_num, int inversed
 	
 		size_t highest=-1;
 		
-		for(size_t pos=0;pos<12;pos++)
+		for(size_t pos=0;pos<TRANSLATION_TBL_LEN;pos++)
 		{
 			//we say this is an acceptable score
-			if(data[str*12 + pos]>0.3 && (highest==-1 || data[str*12 + pos] > data[str*12 + highest]))
+			if(data[str*TRANSLATION_TBL_LEN + pos]>0.3 && (highest==-1 || data[str*TRANSLATION_TBL_LEN + pos] > data[str*TRANSLATION_TBL_LEN + highest]))
 			{
 				highest=pos;
 			}
@@ -181,6 +181,12 @@ long get_actual_result(const char *input)
 				
 				return a_val+b_val;
 			}
+			else if(*tmp=='-')
+			{
+				long b_val=strtol(tmp+1,NULL,10);
+				
+				return a_val-b_val;
+			}
 		}
 	}
 	
@@ -199,7 +205,7 @@ int print_tensor(float *data, size_t num_elements)
 {
 	for (int i = 0; i < num_elements; i++)
 	{
-		if(i%12==0 && i!=0)
+		if(i%TRANSLATION_TBL_LEN==0 && i!=0)
 		{
 			printf("\n");
 		}
@@ -275,61 +281,109 @@ int main(const int argc, char **const argv)
 	TF_Tensor *output_values[num_outputs];
 
 	int ndims = 3;
-	int64_t dims[] = {1, 7, 12};
+	int64_t dims[] = {1, 7, TRANSLATION_TBL_LEN};
+	float data[1 * 7 * TRANSLATION_TBL_LEN];
 	
-	/*
-	Example of a input table. We will convert it to a string
-	[
-		[ True False False False False False False False False False False False]
-		[False False False False False False False False False  True False False]
-		[False False False False False False False False  True False False False]
-		[False  True False False False False False False False False False False]
-		[False False False False False False False False False False  True False]
-		[False False False False False False False False False False False  True]
-		[False False False False False False False False False False  True False]
-	]
-	-> [ 76+898]
-	*/
-	float data[1 * 7 * 12];
-/*	for (int i = 0; i < (1 * 7 * 12); i++)
+	char input_data[7+1]={0};
+	int input_data_pos=0;
+	
+	int exit=0;
+	
+	while(exit==0)
 	{
-		data[i] = 1.00;
-	}*/
-	
-	// Will work for maximum 7 characters
-	const char *input_data="396+945";
-	//const char *input_data="273+92";
-	//const char *input_data="2+2";
-	
-	set_value_from_string(input_data,data);
-	
-	char validate[7+1]={0};
-	get_string_from_value(data,validate,7,INVERT);
-	
-	int ndata = sizeof(float) * 7 * 12; // This is tricky, it number of bytes not number of element
+		printf("Input simple equation (q to quit):\n");	
+		
+		while(1)
+		{
+			char c=getc(stdin);
+			
+			if(c=='\n')
+			{
+				if(input_data_pos>0)
+				{
+					break;
+				}
+				else
+				{
+					input_data_pos=0;
+					continue;
+				}
+			}
+			else if(c=='q')
+			{
+				exit=1;
+				goto quit_prog;
+			}
+			input_data[input_data_pos]=c;
+			input_data_pos++;
+			
+			input_data[input_data_pos]='\0';
+			
+			if(input_data_pos>=sizeof(input_data)-1)
+			{
+				fprintf(stdout,"%s:%d Character overload\n",__FILE__,__LINE__);
+				break;
+			}
+		}
+		
+		input_data[input_data_pos]='\0';
+		input_data_pos=0;
+		
+		fprintf(stdout,"%s:%d Got input string = [%s]\n",__FILE__,__LINE__,input_data);
+		
+		set_value_from_string(input_data,data);
+		
+		char validate[7+1]={0};
+		get_string_from_value(data,validate,7,INVERT);
+		
+		int ndata = sizeof(float) * 7 * TRANSLATION_TBL_LEN; // This is tricky, it number of bytes not number of element
 
-	TF_Tensor *int_tensor = TF_NewTensor(TF_FLOAT, dims, ndims, data, ndata, &no_op_deallocator, 0);
-	if (int_tensor != NULL)
-	{
-		fprintf(stdout,"%s:%d TF_NewTensor is OK\n",__FILE__,__LINE__);
-	}
-	else
-	{
-		fprintf(stderr,"%s:%d ERROR: Failed TF_NewTensor\n",__FILE__,__LINE__);
-	}
+		TF_Tensor *int_tensor = TF_NewTensor(TF_FLOAT, dims, ndims, data, ndata, &no_op_deallocator, 0);
+		if (int_tensor != NULL)
+		{
+			fprintf(stdout,"%s:%d TF_NewTensor is OK\n",__FILE__,__LINE__);
+		}
+		else
+		{
+			fprintf(stderr,"%s:%d ERROR: Failed TF_NewTensor\n",__FILE__,__LINE__);
+		}
 
-	input_values[0] = int_tensor;
+		input_values[0] = int_tensor;
 
-	// //Run the Session
-	TF_SessionRun(session, NULL, input, input_values, num_inputs, output, output_values, num_outputs, NULL, 0, NULL, status);
+		// //Run the Session
+		TF_SessionRun(session, NULL, input, input_values, num_inputs, output, output_values, num_outputs, NULL, 0, NULL, status);
 
-	if (TF_GetCode(status) == TF_OK)
-	{
-		fprintf(stdout,"%s:%d Session is OK\n",__FILE__,__LINE__);
-	}
-	else
-	{
-		fprintf(stderr,"%s:%d Session returned with [%s]\n",__FILE__,__LINE__, TF_Message(status));
+		if (TF_GetCode(status) == TF_OK)
+		{
+			fprintf(stdout,"%s:%d Session is OK\n",__FILE__,__LINE__);
+		}
+		else
+		{
+			fprintf(stderr,"%s:%d Session returned with [%s]\n",__FILE__,__LINE__, TF_Message(status));
+		}
+		
+		void *buff = TF_TensorData(output_values[0]);
+		int64_t num_elements = TF_TensorElementCount(output_values[0]);
+		
+		float *offsets = (float *)buff;
+		
+		printf("Input Tensor %lld:\n",ndata/sizeof(float));
+		print_tensor(data,ndata/sizeof(float));
+		
+		printf("Result Tensor %lld:\n",num_elements);
+		print_tensor(offsets,num_elements);
+		
+		//need '\0' in the end
+		char output_s[4+1]={0};
+		
+		get_string_from_value(offsets,output_s,4,0);
+		
+		fprintf(stdout,"%s:%d INPUT VALUE [%s] ACTUAL [\"%s\"] = [\"%s\"] (Calculated \"true\" result=%ld)\n",__FILE__,__LINE__,input_data,validate,output_s,get_actual_result(input_data));
+		
+		TF_DeleteTensor(int_tensor);
+		TF_DeleteTensor(output_values[0]);
+		
+	quit_prog: ;
 	}
 	
 	// //Free memory
@@ -337,25 +391,4 @@ int main(const int argc, char **const argv)
 	TF_DeleteSession(session, status);
 	TF_DeleteSessionOptions(session_opts);
 	TF_DeleteStatus(status);
-
-	void *buff = TF_TensorData(output_values[0]);
-	int64_t num_elements = TF_TensorElementCount(output_values[0]);
-	
-	float *offsets = (float *)buff;
-	
-	printf("Input Tensor %lld:\n",ndata/sizeof(float));
-	print_tensor(data,ndata/sizeof(float));
-	
-	printf("Result Tensor %lld:\n",num_elements);
-	print_tensor(offsets,num_elements);
-	
-	//need '\0' in the end
-	char output_s[4+1]={0};
-	
-	get_string_from_value(offsets,output_s,4,0);
-	
-	fprintf(stdout,"%s:%d INPUT VALUE [%s] ACTUAL [\"%s\"] = [\"%s\"] (Calculated \"true\" result=%ld)\n",__FILE__,__LINE__,input_data,validate,output_s,get_actual_result(input_data));
-	
-	TF_DeleteTensor(int_tensor);
-	TF_DeleteTensor(output_values[0]);
 }
